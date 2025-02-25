@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Browser</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <style>
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1e1e1e;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+        }
+        h1 {
+            margin-bottom: 20px;
+            color: #1e88e5;
+            cursor: pointer;
+        }
+        #file-list {
+            text-align: left;
+        }
+        .file-item {
+            padding: 10px;
+            background-color: #2c2c2c;
+            border-radius: 5px;
+            margin-bottom: 5px;
+            transition: background-color 0.3s;
+        }
+        .file-item:hover {
+            background-color: #333333;
+        }
+        .file-item a {
+            color: #ffffff;
+            text-decoration: none;
+            font-size: 16px;
+            word-wrap: break-word;
+            display: block;
+        }
+        .file-item a:hover {
+            text-decoration: underline;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .button {
+            background-color: #e53935;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+            display: inline-block;
+        }
+        .button:hover {
+            background-color: #c62828;
+        }
+        #random-button {
+            background-color: #43a047;
+        }
+        #random-button:hover {
+            background-color: #388e3c;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        function FileBrowser() {
+            const [currentPath, setCurrentPath] = React.useState("/");
+            const [files, setFiles] = React.useState([]);
+            const [allFiles, setAllFiles] = React.useState([]);
+
+            React.useEffect(() => {
+                loadFiles(currentPath);
+            }, [currentPath]);
+
+            function loadFiles(path) {
+                fetch('http://100.109.39.110/web' + path)
+                    .then(response => response.text())
+                    .then(html => {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+                        const links = doc.querySelectorAll('a');
+                        let fileArray = [];
+                        let allFileArray = [];
+
+                        links.forEach(link => {
+                            let href = link.getAttribute('href');
+                            let fileName = decodeURIComponent(link.innerText.trim());
+
+                            if (fileName === "../") return;
+
+                            let fileUrl = 'http://100.109.39.110/web' + (href.startsWith('http') ? href : path + href);
+                            let fileExtension = fileName.split('.').pop().toLowerCase();
+
+                            if (fileExtension === 'mkv' || fileExtension === 'avi') {
+                                fileUrl = 'vlc://' + fileUrl;
+                            }
+
+                            fileArray.push({ name: fileName, url: fileUrl, isFolder: href.endsWith('/') });
+
+                            if (!href.endsWith('/')) {
+                                allFileArray.push({ name: fileName, url: fileUrl });
+                            }
+                        });
+
+                        setFiles(fileArray);
+                        setAllFiles(allFileArray);
+                    })
+                    .catch(error => {
+                        console.error("Помилка завантаження файлів:", error);
+                    });
+            }
+
+            function goBack() {
+                if (currentPath !== "/") {
+                    const pathParts = currentPath.split('/').filter(p => p);
+                    pathParts.pop();
+                    setCurrentPath(pathParts.length ? "/" + pathParts.join('/') + "/" : "/");
+                }
+            }
+
+            function openRandomFile() {
+                if (allFiles.length > 0) {
+                    const randomFile = allFiles[Math.floor(Math.random() * allFiles.length)];
+                    window.location.href = randomFile.url;
+                } else {
+                    alert('Немає файлів у цій папці.');
+                }
+            }
+
+            return (
+                <div className="container">
+                    <h1 onClick={() => setCurrentPath("/")}>File Browser</h1>
+                    <div className="button-container">
+                        {currentPath !== "/" && <button className="button" onClick={goBack}>⬅ Go Back</button>}
+                        {allFiles.length > 0 && <button id="random-button" className="button" onClick={openRandomFile}>🎲 Random</button>}
+                    </div>
+                    <div id="file-list">
+                        {files.length === 0 ? "Завантаження файлів..." : (
+                            files.map((file, index) => (
+                                <div key={index} className="file-item">
+                                    {file.isFolder ? (
+                                        <a href="#" onClick={(e) => { e.preventDefault(); setCurrentPath(currentPath + file.name + "/"); }}>
+                                            📁 {file.name}
+                                        </a>
+                                    ) : (
+                                        <a href={file.url}>📄 {file.name}</a>
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById("root"));
+        root.render(<FileBrowser />);
+    </script>
+</body>
+</html>
