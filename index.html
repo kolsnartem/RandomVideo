@@ -1,180 +1,200 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>File Browser</title>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
-            background-color: #121212;
-            color: #ffffff;
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+            background: #0a0e1a;
+            color: #d1d5db;
             margin: 0;
-            padding: 20px;
-            text-align: center;
+            overflow-y: auto;
+            height: 100vh;
         }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #1e1e1e;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+        #app-container {
+            padding: 2rem 1rem 1rem 1rem;
+            min-height: 100%;
         }
-        h1 {
-            margin-bottom: 20px;
-            color: #1e88e5;
-            cursor: pointer;
+        #file-container {
+            space-y: 2;
         }
-        #file-list {
-            text-align: left;
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        .file-item {
-            padding: 10px;
-            background-color: #2c2c2c;
-            border-radius: 5px;
-            margin-bottom: 5px;
-            transition: background-color 0.3s;
+        .fade-in {
+            animation: fadeIn 0.2s ease-out;
         }
-        .file-item:hover {
-            background-color: #333333;
+        @supports (padding: env(safe-area-inset-top)) {
+            #app-container {
+                padding-top: calc(env(safe-area-inset-top) + 2rem);
+                padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
+                padding-left: env(safe-area-inset-left);
+                padding-right: env(safe-area-inset-right);
+            }
         }
-        .file-item a {
-            color: #ffffff;
-            text-decoration: none;
-            font-size: 16px;
-            word-wrap: break-word;
-            display: block;
+        .modern-btn {
+            background: linear-gradient(135deg, #1e293b 0%, #111827 100%);
+            border: 1px solid #374151;
+            transition: all 0.3s ease;
         }
-        .file-item a:hover {
-            text-decoration: underline;
-        }
-        .button-container {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-        .button {
-            background-color: #e53935;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            cursor: pointer;
-            border-radius: 5px;
-            font-size: 16px;
-            display: inline-block;
-        }
-        .button:hover {
-            background-color: #c62828;
-        }
-        #random-button {
-            background-color: #43a047;
-        }
-        #random-button:hover {
-            background-color: #388e3c;
+        .modern-btn:hover {
+            background: linear-gradient(135deg, #334155 0%, #1f2937 100%);
+            border-color: #4b5563;
+            transform: translateY(-1px);
         }
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="app-container">
+        <h1 class="text-2xl font-semibold text-center mb-6 text-gray-200 cursor-pointer bg-gradient-to-r from-gray-200 to-blue-400 text-transparent bg-clip-text" onclick="resetPath()">File Browser</h1>
+        
+        <div class="flex flex-row gap-3 mb-4 justify-center">
+            <button id="back-btn" class="hidden modern-btn text-gray-200 px-5 py-2 rounded-full text-base shadow-sm" onclick="goBack()">Back</button>
+            <button id="random-btn" class="hidden modern-btn text-gray-200 px-5 py-2 rounded-full text-base shadow-sm" onclick="playRandom()">Random</button>
+        </div>
 
-    <script type="text/babel">
-        function FileBrowser() {
-            const [currentPath, setCurrentPath] = React.useState("/");
-            const [files, setFiles] = React.useState([]);
-            const [allFiles, setAllFiles] = React.useState([]);
+        <div id="file-container" class="space-y-2">
+            <p id="loading" class="text-center text-gray-500 text-base">Loading...</p>
+        </div>
+    </div>
 
-            React.useEffect(() => {
-                loadFiles(currentPath);
-            }, [currentPath]);
+    <script>
+        const BASE_URL = 'http://100.109.39.110/web';
+        let currentPath = '/';
+        let allFiles = [];
 
-            function loadFiles(path) {
-                fetch('http://100.109.39.110/web' + path)
-                    .then(response => response.text())
-                    .then(html => {
-                        const parser = new DOMParser();
-                        const doc = parser.parseFromString(html, 'text/html');
-                        const links = doc.querySelectorAll('a');
-                        let fileArray = [];
-                        let allFileArray = [];
-
-                        links.forEach(link => {
-                            let href = link.getAttribute('href');
-                            let fileName = decodeURIComponent(link.innerText.trim());
-
-                            if (fileName === "../") return;
-
-                            let fileUrl = 'http://100.109.39.110/web' + (href.startsWith('http') ? href : path + href);
-                            let fileExtension = fileName.split('.').pop().toLowerCase();
-
-                            if (fileExtension === 'mkv' || fileExtension === 'avi') {
-                                fileUrl = 'vlc://' + fileUrl;
-                            }
-
-                            fileArray.push({ name: fileName, url: fileUrl, isFolder: href.endsWith('/') });
-
-                            if (!href.endsWith('/')) {
-                                allFileArray.push({ name: fileName, url: fileUrl });
-                            }
-                        });
-
-                        setFiles(fileArray);
-                        setAllFiles(allFileArray);
-                    })
-                    .catch(error => {
-                        console.error("Помилка завантаження файлів:", error);
-                    });
-            }
-
-            function goBack() {
-                if (currentPath !== "/") {
-                    const pathParts = currentPath.split('/').filter(p => p);
-                    pathParts.pop();
-                    setCurrentPath(pathParts.length ? "/" + pathParts.join('/') + "/" : "/");
-                }
-            }
-
-            function openRandomFile() {
-                if (allFiles.length > 0) {
-                    const randomFile = allFiles[Math.floor(Math.random() * allFiles.length)];
-                    window.location.href = randomFile.url;
-                } else {
-                    alert('Немає файлів у цій папці.');
-                }
-            }
-
-            return (
-                <div className="container">
-                    <h1 onClick={() => setCurrentPath("/")}>File Browser</h1>
-                    <div className="button-container">
-                        {currentPath !== "/" && <button className="button" onClick={goBack}>⬅ Go Back</button>}
-                        {allFiles.length > 0 && <button id="random-button" className="button" onClick={openRandomFile}>🎲 Random</button>}
-                    </div>
-                    <div id="file-list">
-                        {files.length === 0 ? "Завантаження файлів..." : (
-                            files.map((file, index) => (
-                                <div key={index} className="file-item">
-                                    {file.isFolder ? (
-                                        <a href="#" onClick={(e) => { e.preventDefault(); setCurrentPath(currentPath + file.name + "/"); }}>
-                                            📁 {file.name}
-                                        </a>
-                                    ) : (
-                                        <a href={file.url}>📄 {file.name}</a>
-                                    )}
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </div>
-            );
+        // Функція для збереження історії
+        function saveToHistory(fileName, fileUrl) {
+            const history = JSON.parse(localStorage.getItem('fileHistory') || '[]');
+            const timestamp = new Date().toLocaleString('uk-UA'); // Формат дати/часу для України
+            const newEntry = { name: fileName, url: fileUrl, timestamp };
+            // Видаляємо дублікат, якщо є, і додаємо новий запис на початок
+            const updatedHistory = history.filter(entry => entry.url !== fileUrl);
+            updatedHistory.unshift(newEntry);
+            localStorage.setItem('fileHistory', JSON.stringify(updatedHistory.slice(0, 10))); // Обмежуємо до 10 записів
         }
 
-        const root = ReactDOM.createRoot(document.getElementById("root"));
-        root.render(<FileBrowser />);
+        // Завантаження файлів або історії
+        async function loadFiles(path) {
+            const fileContainer = document.getElementById('file-container');
+            fileContainer.innerHTML = '';
+            allFiles = [];
+
+            if (path === '/history') {
+                // Показуємо історію
+                const history = JSON.parse(localStorage.getItem('fileHistory') || '[]');
+                if (history.length === 0) {
+                    fileContainer.innerHTML = '<p class="text-center text-gray-500 text-base">No history yet.</p>';
+                } else {
+                    history.forEach(entry => {
+                        const fileItem = document.createElement('div');
+                        fileItem.className = 'bg-gray-800/50 hover:bg-gray-700/50 p-3 rounded-lg transition-all duration-200 fade-in cursor-pointer text-base';
+                        fileItem.innerHTML = `
+                            <span class="text-gray-400 mr-2">📄</span>
+                            <span>${entry.name}</span>
+                            <span class="text-gray-500 text-sm ml-2">(${entry.timestamp})</span>
+                        `;
+                        fileItem.onclick = () => window.location.href = entry.url;
+                        fileContainer.appendChild(fileItem);
+                    });
+                }
+            } else {
+                // Додаємо кнопку "History" на головній сторінці
+                if (path === '/') {
+                    const historyItem = document.createElement('div');
+                    historyItem.className = 'bg-gray-800/50 hover:bg-gray-700/50 p-3 rounded-lg transition-all duration-200 fade-in cursor-pointer text-base';
+                    historyItem.innerHTML = `
+                        <span class="text-gray-400 mr-2">⏳</span>
+                        <span>History</span>
+                    `;
+                    historyItem.onclick = () => setPath('/history');
+                    fileContainer.appendChild(historyItem);
+                }
+
+                // Завантажуємо файли
+                try {
+                    const response = await fetch(BASE_URL + path);
+                    const html = await response.text();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const links = doc.querySelectorAll('a');
+
+                    links.forEach(link => {
+                        const href = link.getAttribute('href');
+                        const fileName = decodeURIComponent(link.innerText.trim());
+
+                        if (fileName === '../') return;
+
+                        const fileUrl = BASE_URL + (href.startsWith('http') ? href : path + href);
+                        const fileExtension = fileName.split('.').pop().toLowerCase();
+                        const isFolder = href.endsWith('/');
+
+                        const fileItem = document.createElement('div');
+                        fileItem.className = 'bg-gray-800/50 hover:bg-gray-700/50 p-3 rounded-lg transition-all duration-200 fade-in cursor-pointer text-base';
+                        fileItem.innerHTML = `
+                            <span class="text-gray-400 mr-2">${isFolder ? '📁' : '📄'}</span>
+                            <span>${fileName}</span>
+                        `;
+
+                        if (isFolder) {
+                            fileItem.onclick = () => setPath(path + fileName + '/');
+                        } else {
+                            const finalUrl = (fileExtension === 'mkv' || fileExtension === 'avi') ? `vlc://${fileUrl}` : fileUrl;
+                            fileItem.onclick = () => {
+                                saveToHistory(fileName, finalUrl);
+                                window.location.href = finalUrl;
+                            };
+                            allFiles.push({ name: fileName, url: finalUrl });
+                        }
+
+                        fileContainer.appendChild(fileItem);
+                    });
+                } catch (error) {
+                    console.error('Error loading files:', error);
+                    fileContainer.innerHTML = '<p class="text-center text-red-400 text-base">Failed to load files.</p>';
+                }
+            }
+
+            document.getElementById('back-btn').classList.toggle('hidden', path === '/');
+            document.getElementById('random-btn').classList.toggle('hidden', allFiles.length === 0 || path === '/history');
+        }
+
+        // Навігація
+        function setPath(newPath) {
+            currentPath = newPath;
+            loadFiles(currentPath);
+        }
+
+        function goBack() {
+            if (currentPath !== '/') {
+                const pathParts = currentPath.split('/').filter(p => p);
+                pathParts.pop();
+                setPath(pathParts.length ? '/' + pathParts.join('/') + '/' : '/');
+            }
+        }
+
+        function resetPath() {
+            setPath('/');
+        }
+
+        function playRandom() {
+            if (allFiles.length > 0) {
+                const randomFile = allFiles[Math.floor(Math.random() * allFiles.length)];
+                saveToHistory(randomFile.name, randomFile.url);
+                window.location.href = randomFile.url;
+            }
+        }
+
+        // Ініціалізація
+        window.addEventListener('load', () => {
+            loadFiles(currentPath);
+        });
     </script>
 </body>
 </html>
